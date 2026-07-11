@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="description" content="Sector 69 - Season 1, a premium Malayalam animated web series reel experience." />
+    <title>Sector 69 - Season 1</title>
+    <link rel="preload" href="assets/logo.png" as="image" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body class="season-page">
+    <header class="site-header" aria-label="Sector69">
+      <img src="assets/logo.png" class="site-logo" alt="Sector69 Logo" />
+    </header>
+
+    <div class="ambient" aria-hidden="true">
+      <span class="orb orb-one"></span>
+      <span class="orb orb-two"></span>
+      <span class="orb orb-three"></span>
+      <div class="particle-field"></div>
+    </div>
+
+    <section class="loader" id="loader" aria-label="Loading Sector 69">
+      <div class="loader__core">
+        <p class="loader__season">Season 1</p>
+        <p class="loader__percent" id="loaderPercent">0%</p>
+        <div class="loader__track" aria-hidden="true">
+          <span id="loaderBar"></span>
+        </div>
+      </div>
+    </section>
+
+    <main class="reel-feed" id="reelFeed" aria-label="Sector 69 Season 1 video feed">
+      <button class="start-button" id="startButton" type="button" aria-label="Play Sector 69 Season 1">
+        <span class="start-button__icon"></span>
+      </button>
+    </main>
+
+    <template id="reelTemplate">
+      <article class="reel">
+        <div class="reel__stage">
+          <video class="reel__backdrop" muted playsinline webkit-playsinline preload="none" aria-hidden="true"></video>
+          <video class="reel__video" playsinline webkit-playsinline preload="none"></video>
+          <div class="feedback-icon" aria-hidden="true"></div>
+          <div class="controls" aria-label="Video controls">
+            <button class="control control-play" type="button" aria-label="Play video"></button>
+            <div class="progress-wrap">
+              <input class="seek" type="range" min="0" max="100" value="0" step="0.1" aria-label="Video progress" />
+            </div>
+            <button class="control control-mute" type="button" aria-label="Mute"></button>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script src="js/script.js" defer></script>
+  </body>
+</html>
