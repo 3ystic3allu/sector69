@@ -1,6 +1,5 @@
 const LOOP_AFTER_FINAL_VIDEO = true;
-const RESET_VIDEO_WHEN_INACTIVE = false;
-const VIDEO_START_OFFSET_SECONDS = 1.2;
+const RESET_VIDEO_WHEN_INACTIVE = true;
 
 // Static hosting cannot scan folders at runtime. Keep seasons in viewing order.
 // Add a new season by adding one object with its folder and files.
@@ -195,7 +194,6 @@ let activeIndex = 0;
 let loaderValue = 0;
 let hasUserInteracted = false;
 let isMuted = false;
-let isAutoScrolling = false;
 let controlsTimer = 0;
 let lastTapAt = 0;
 let activationTimer = 0;
@@ -205,7 +203,6 @@ const videoFor = (reel) => reel.querySelector(".reel__video");
 const backdropFor = (reel) => reel.querySelector(".reel__backdrop");
 const previousIndexFor = (index) => (index > 0 ? index - 1 : LOOP_AFTER_FINAL_VIDEO ? reels.length - 1 : -1);
 const nextIndexFor = (index) => (index + 1 < reels.length ? index + 1 : LOOP_AFTER_FINAL_VIDEO ? 0 : -1);
-const startOffsetFor = (video) => (video.duration > VIDEO_START_OFFSET_SECONDS + 0.5 ? VIDEO_START_OFFSET_SECONDS : 0);
 
 const createParticles = () => {
   const colors = ["#ff2d95", "#8b5cff", "#00e5ff", "#ff7a18", "#ffffff"];
@@ -254,24 +251,35 @@ const loadVideo = (reel, includeBackdrop = false) => {
   }
 };
 
-const moveToStartOffset = (reel) => {
+const resetReelToStart = (reel) => {
   const video = videoFor(reel);
   const backdrop = backdropFor(reel);
-  const offset = startOffsetFor(video);
+  const seek = reel.querySelector(".seek");
 
-  if (offset && video.currentTime < offset) {
-    video.currentTime = offset;
+  try {
+    if (video.readyState && video.currentTime !== 0) {
+      video.currentTime = 0;
+    }
+  } catch (error) {
+    console.warn("Video reset to start was skipped:", error);
   }
 
-  if (offset && backdrop.src && backdrop.currentTime < offset) {
-    backdrop.currentTime = offset;
+  try {
+    if (backdrop.readyState && backdrop.currentTime !== 0) {
+      backdrop.currentTime = 0;
+    }
+  } catch (error) {
+    console.warn("Backdrop reset to start was skipped:", error);
+  }
+
+  if (seek) {
+    seek.value = 0;
   }
 };
 
 const cleanupVideo = (reel, index) => {
-  const previousIndex = previousIndexFor(activeIndex);
   const nextIndex = nextIndexFor(activeIndex);
-  if (index === activeIndex || index === previousIndex || index === nextIndex) return;
+  if (index === activeIndex || index === nextIndex) return;
 
   const video = videoFor(reel);
   const backdrop = backdropFor(reel);
@@ -279,8 +287,7 @@ const cleanupVideo = (reel, index) => {
   backdrop.pause();
 
   if (RESET_VIDEO_WHEN_INACTIVE) {
-    video.currentTime = startOffsetFor(video);
-    backdrop.currentTime = startOffsetFor(video);
+    resetReelToStart(reel);
   }
 
   if (video.src) {
@@ -296,14 +303,13 @@ const cleanupVideo = (reel, index) => {
   }
 };
 
-// Lazy loading: active reel gets video and blurred backdrop; neighbors get metadata only.
+// Lazy loading: active reel gets video/backdrop, next reel gets metadata, everything else is unloaded.
 const updateNearbyVideos = () => {
-  const previousIndex = previousIndexFor(activeIndex);
   const nextIndex = nextIndexFor(activeIndex);
 
   reels.forEach((reel, index) => {
     if (index === activeIndex) loadVideo(reel, true);
-    else if (index === previousIndex || index === nextIndex) loadVideo(reel, false);
+    else if (index === nextIndex) loadVideo(reel, false);
     else cleanupVideo(reel, index);
   });
 };
@@ -315,8 +321,7 @@ const pauseReel = (reel, reset = false) => {
   backdrop.pause();
 
   if (reset) {
-    video.currentTime = startOffsetFor(video);
-    backdrop.currentTime = startOffsetFor(video);
+    resetReelToStart(reel);
   }
 
   reel.classList.remove("is-playing");
@@ -358,7 +363,6 @@ const playReel = async (reel) => {
   pauseAllExcept(reel);
   video.muted = isMuted;
   backdrop.muted = true;
-  moveToStartOffset(reel);
   syncBackdrop(reel);
 
   try {
@@ -389,30 +393,6 @@ const applyMuteState = () => {
     videoFor(reel).muted = isMuted;
     setControlState(reel);
   });
-};
-
-const scrollToIndex = (index, automatic = false) => {
-  if (index < 0 || index >= reels.length) return;
-  if (automatic && isAutoScrolling) return;
-
-  if (automatic) isAutoScrolling = true;
-  reels[index].scrollIntoView({ behavior: "smooth", block: "start" });
-
-  if (automatic) {
-    window.setTimeout(() => {
-      isAutoScrolling = false;
-    }, 700);
-  }
-};
-
-const goToNext = (automatic = false) => {
-  const nextIndex = nextIndexFor(activeIndex);
-  if (nextIndex >= 0) scrollToIndex(nextIndex, automatic);
-};
-
-const goToPrevious = () => {
-  const previousIndex = previousIndexFor(activeIndex);
-  if (previousIndex >= 0) scrollToIndex(previousIndex);
 };
 
 const activateReel = (index) => {
@@ -493,13 +473,16 @@ const hydrateReel = (reel) => {
   seek.addEventListener("input", () => {
     if (video.duration) {
       const nextTime = (Number(seek.value) / 100) * video.duration;
-      video.currentTime = Math.max(nextTime, startOffsetFor(video));
+      video.currentTime = nextTime;
       syncBackdrop(reel);
     }
     showControls(reel);
   });
 
-  video.addEventListener("loadedmetadata", () => moveToStartOffset(reel));
+  video.addEventListener("loadedmetadata", () => {
+    resetReelToStart(reel);
+    seek.value = 0;
+  });
 
   video.addEventListener("timeupdate", () => {
     seek.value = video.duration ? (video.currentTime / video.duration) * 100 : 0;
@@ -519,7 +502,6 @@ const hydrateReel = (reel) => {
 
   video.addEventListener("ended", () => {
     pauseReel(reel, true);
-    goToNext(true);
   });
 
   backdrop.addEventListener("timeupdate", () => {
@@ -579,23 +561,12 @@ startButton.addEventListener("click", () => {
   playReel(reels[activeIndex]);
 });
 
-["wheel", "touchstart", "pointerdown"].forEach((eventName) => {
-  feed.addEventListener(
-    eventName,
-    () => {
-      isAutoScrolling = false;
-    },
-    { passive: true }
-  );
-});
-
 document.addEventListener("keydown", (event) => {
   const activeReel = reels[activeIndex];
   if (!activeReel) return;
 
   if (["Space", "ArrowDown", "ArrowUp"].includes(event.code)) {
     event.preventDefault();
-    isAutoScrolling = false;
   }
 
   if (event.code === "Space") {
@@ -603,8 +574,6 @@ document.addEventListener("keydown", (event) => {
     else pauseReel(activeReel);
   }
 
-  if (event.code === "ArrowDown") goToNext();
-  if (event.code === "ArrowUp") goToPrevious();
   if (event.key.toLowerCase() === "m") {
     isMuted = !isMuted;
     applyMuteState();
